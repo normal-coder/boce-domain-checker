@@ -1,17 +1,16 @@
 package main
 
 type DetectRequest struct {
-	APIKey            string   `json:"apiKey"`
-	EnablePollution   bool     `json:"enablePollution"`
-	EnableHijack      bool     `json:"enableHijack"`
-	EnableWechat      bool     `json:"enableWechat"`
-	EnableICP         bool     `json:"enableIcp"`
-	EnableBlacklist   bool     `json:"enableBlacklist"`
-	EnableWall        bool     `json:"enableWall"`
-	Concurrency       int      `json:"concurrency"`
-	TimeoutSeconds    int      `json:"timeoutSeconds"`
-	ImportedTargetCnt int      `json:"importedTargetCount"`
-	Targets           []string `json:"targets"`
+	APIKey          string   `json:"apiKey"`
+	EnablePollution bool     `json:"enablePollution"`
+	EnableHijack    bool     `json:"enableHijack"`
+	EnableWechat    bool     `json:"enableWechat"`
+	EnableICP       bool     `json:"enableIcp"`
+	EnableBlacklist bool     `json:"enableBlacklist"`
+	EnableWall      bool     `json:"enableWall"`
+	Concurrency     int      `json:"concurrency"`
+	TimeoutSeconds  int      `json:"timeoutSeconds"`
+	Targets         []string `json:"targets"`
 }
 
 type DetectRow struct {
@@ -58,12 +57,6 @@ type DetectStartEvent struct {
 	Total int `json:"total"`
 }
 
-type bocePolluteResponse struct {
-	ErrorCode int            `json:"error_code"`
-	Error     string         `json:"error"`
-	Data      map[string]int `json:"data"`
-}
-
 type boceQQResponse struct {
 	ErrorCode int            `json:"error_code"`
 	Error     string         `json:"error"`
@@ -87,4 +80,12 @@ type boceICPInfo struct {
 	Type             string `json:"type"`
 	VerifyTime       string `json:"verifyTime"`
 	UpdateTime       string `json:"updateTime"`
+}
+
+// ValidateTargetsResponse 是 ValidateTargets 的返回：
+// 合法 host、非法原始项，以及与前端一致的中文提示文案。
+type ValidateTargetsResponse struct {
+	Valid   []string `json:"valid"`
+	Invalid []string `json:"invalid"`
+	Message string   `json:"message"`
 }

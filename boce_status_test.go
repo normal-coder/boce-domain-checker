@@ -111,8 +111,8 @@ func jsStatusListValues(t *testing.T, js string) []string {
 }
 
 // TestStatusConstantsCoverSummarizeBuckets 断言 summarizeRows 的 4 个分类
-// 覆盖的文案集合与常量表一致：除 StatusUnknown（设计上不入任何分类）外无遗漏，
-// 常量表之外的文案无多余。
+// 覆盖的文案集合与常量表一致：12 个状态全部入桶（StatusUnknown 归入「失败」桶，
+// 见 TestSummarizeRowsCountsUnknownAsFailed），常量表之外的文案不入桶。
 func TestStatusConstantsCoverSummarizeBuckets(t *testing.T) {
 	constants := statusConstants()
 	seen := map[string]bool{}
@@ -154,9 +154,9 @@ func TestStatusConstantsCoverSummarizeBuckets(t *testing.T) {
 		}
 	}
 
-	// 无遗漏：只有 StatusUnknown 设计上不入分类。
-	if len(unbucketed) != 1 || unbucketed[0] != StatusUnknown {
-		t.Fatalf("不入分类的状态 = %v, want 仅 [%q]", unbucketed, StatusUnknown)
+	// 无遗漏：常量表里的 12 个状态都必须入桶，不能有数字对不上的漏网状态。
+	if len(unbucketed) != 0 {
+		t.Fatalf("不入分类的状态 = %v, want 空（总数与四桶之和会因此对不上）", unbucketed)
 	}
 
 	// 无多余：常量表之外的文案不入任何分类。
@@ -231,4 +231,32 @@ func functionBodies(source string) map[string]string {
 		bodies[name[1]] = part
 	}
 	return bodies
+}
+
+// TestSummarizeRowsCountsUnknownAsFailed 断言 StatusUnknown（"未知"）归入「失败」桶。
+// 003 之前它落在所有桶外：喂 {Status:"未知"} 会得到 Total=1 而四桶之和=0，
+// 底栏「总数 / 异常 / 正常 / 未注册 / 失败」加起来对不上总数。
+func TestSummarizeRowsCountsUnknownAsFailed(t *testing.T) {
+	got := summarizeRows([]DetectRow{{Status: StatusUnknown}})
+	if got.Failed != 1 {
+		t.Fatalf("summarizeRows(未知).Failed = %d, want 1: %#v", got.Failed, got)
+	}
+	buckets := got.Pollution + got.Normal + got.Unregistered + got.Failed
+	if got.Total != buckets {
+		t.Fatalf("Total = %d, want 四桶之和 %d: %#v", got.Total, buckets, got)
+	}
+
+	mixed := summarizeRows([]DetectRow{
+		{Status: StatusUnknown},
+		{Status: StatusFailed},
+		{Status: StatusNormal},
+		{Status: StatusPollution},
+	})
+	if mixed.Failed != 2 || mixed.Normal != 1 || mixed.Pollution != 1 {
+		t.Fatalf("summarizeRows(混排) = %#v", mixed)
+	}
+	mixedBuckets := mixed.Pollution + mixed.Normal + mixed.Unregistered + mixed.Failed
+	if mixed.Total != mixedBuckets {
+		t.Fatalf("混排 Total = %d, want 四桶之和 %d: %#v", mixed.Total, mixedBuckets, mixed)
+	}
 }

@@ -21,7 +21,7 @@ func makeMockDetectionResponse(message string, enablePollution bool, enableQQ bo
 				Failed:       18,
 			},
 			Progress:   100,
-			ExportPath: "C:/Users/xjw/Desktop/全部污染.xlsx",
+			ExportPath: "",
 			Message:    message,
 		}
 	}
@@ -31,7 +31,7 @@ func makeMockDetectionResponse(message string, enablePollution bool, enableQQ bo
 		Rows:       rows,
 		Summary:    summary,
 		Progress:   100,
-		ExportPath: "C:/Users/xjw/Desktop/全部污染.xlsx",
+		ExportPath: "",
 		Message:    message,
 	}
 }
