@@ -11,7 +11,6 @@ import {ABNORMAL_STATUSES, STATUS_BAD_DOMAIN, STATUS_BLACKLISTED, STATUS_FAILED,
 const rows = ref([])
 const selectedId = ref(null)
 const running = ref(false)
-const paused = ref(false)
 const notice = ref('')
 const exportPath = ref('')
 const progress = ref(0)
@@ -37,7 +36,6 @@ const summary = reactive({
   failed: 0,
 })
 
-const canPause = computed(() => running.value && rows.value.length > 0)
 const statusOrder = STATUS_LIST
 const statusOptions = computed(() => {
   const statuses = [...new Set(rows.value.map(row => row.status).filter(Boolean))]
@@ -290,6 +288,9 @@ async function importTxt() {
 }
 
 async function startDetection() {
+  if (running.value) {
+    return
+  }
   const validation = validateTargetText()
   targetError.value = validation.message
   if (!validation.ok) {
@@ -298,7 +299,6 @@ async function startDetection() {
   }
 
   running.value = true
-  paused.value = false
   notice.value = '正在检测...'
   progress.value = 0
   streamTotal.value = 0
@@ -307,42 +307,41 @@ async function startDetection() {
   const targets = validation.targets
   importedTargets.value = targets
 
-  const result = await StartDetection({
-    apiKey: form.apiKey,
-    enablePollution: form.detectionType === 'pollution',
-    enableHijack: form.detectionType === 'qq',
-    enableWechat: form.detectionType === 'wechat',
-    enableIcp: form.detectionType === 'icp',
-    enableBlacklist: form.detectionType === 'blacklist',
-    enableWall: form.detectionType === 'wall',
-    concurrency: Number(form.concurrency),
-    timeoutSeconds: Number(form.timeoutSeconds),
-    importedTargetCount: targets.length,
-    targets,
-  })
+  try {
+    const result = await StartDetection({
+      apiKey: form.apiKey,
+      enablePollution: form.detectionType === 'pollution',
+      enableHijack: form.detectionType === 'qq',
+      enableWechat: form.detectionType === 'wechat',
+      enableIcp: form.detectionType === 'icp',
+      enableBlacklist: form.detectionType === 'blacklist',
+      enableWall: form.detectionType === 'wall',
+      concurrency: Number(form.concurrency),
+      timeoutSeconds: Number(form.timeoutSeconds),
+      importedTargetCount: targets.length,
+      targets,
+    })
 
-  rows.value = result.rows || rows.value
-  keepValidStatusFilter()
-  selectedId.value = rows.value[12]?.id || rows.value[0]?.id || null
-  applySummary(result.summary)
-  progress.value = result.progress || 100
-  exportPath.value = result.exportPath || exportPath.value
-  notice.value = result.message || '测试检测完成'
-  running.value = false
-}
-
-function pauseDetection() {
-  if (!canPause.value) {
-    return
+    rows.value = result.rows || rows.value
+    keepValidStatusFilter()
+    selectedId.value = rows.value[0]?.id || null
+    applySummary(result.summary)
+    progress.value = result.progress || 100
+    exportPath.value = result.exportPath || exportPath.value
+    notice.value = result.message || '测试检测完成'
+  } catch (err) {
+    notice.value = `检测失败: ${err?.message || err}`
+  } finally {
+    running.value = false
   }
-  paused.value = !paused.value
-  notice.value = paused.value ? '已暂停测试检测' : '继续测试检测'
 }
 
 function stopDetection() {
-  running.value = false
-  paused.value = false
-  notice.value = rows.value.length ? '已停止测试检测' : '当前没有运行中的检测任务'
+  if (!running.value) {
+    notice.value = '当前没有运行中的检测任务'
+    return
+  }
+  notice.value = '暂不支持中断，检测会继续到完成'
 }
 
 async function exportExcel() {
@@ -387,8 +386,8 @@ async function exportExcel() {
         <span>被墙检测</span>
       </label>
 
-      <label class="spin-field" for="concurrency">并发</label>
-      <input id="concurrency" v-model.number="form.concurrency" class="spin-input" type="number" min="1" max="500">
+      <label class="spin-field" for="concurrency">并发(1-20)</label>
+      <input id="concurrency" v-model.number="form.concurrency" class="spin-input" type="number" min="1" max="20">
 
       <label class="spin-field" for="timeout">超时(秒)</label>
       <input id="timeout" v-model.number="form.timeoutSeconds" class="spin-input" type="number" min="1" max="3600">
@@ -403,9 +402,6 @@ async function exportExcel() {
       <button class="win-button action-button start-button" type="button" :disabled="running" @click="startDetection">
         <span v-if="running" class="button-spinner" aria-hidden="true"></span>
         <span>{{ running ? '检测中' : '开始检测' }}</span>
-      </button>
-      <button class="win-button action-button" type="button" :disabled="!canPause" @click="pauseDetection">
-        {{ paused ? '继续' : '暂停' }}
       </button>
       <button class="win-button action-button" type="button" :disabled="!running && !rows.length" @click="stopDetection">停止</button>
       <button class="win-button export-button" type="button" :disabled="!displayRows.length" @click="exportExcel">导出Excel</button>
