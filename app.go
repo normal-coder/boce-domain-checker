@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -40,6 +41,47 @@ func (a *App) emitDetectRow(row DetectRow) {
 		return
 	}
 	runtime.EventsEmit(a.ctx, "detect:row", row)
+}
+
+// Version 由构建时 -ldflags "-X main.Version=<ver>" 注入；未注入（开发态）时为 "dev"。
+// 注意 base.go 硬编码 -buildvcs=false，读不到 debug.ReadBuildInfo 的 vcs 信息。
+var Version = "dev"
+
+// detecting / quitConfirmed 是 options.OnBeforeClose 轻量拦截的唯一依据：
+// 检测进行中阻止关闭；菜单「退出」确认后放行（runtime.Quit 仍会再走一遍 OnBeforeClose）。
+var (
+	detecting     atomic.Bool
+	quitConfirmed atomic.Bool
+)
+
+// GetVersion 返回应用版本，供前端与「关于」对话框显示。
+func (a *App) GetVersion() string {
+	return Version
+}
+
+// IsDetecting 报告是否有检测任务正在执行。
+func (a *App) IsDetecting() bool {
+	return detecting.Load()
+}
+
+// preventClose 是 options.OnBeforeClose 的实现：只做轻量拦截，【绝不】在这里弹框 ——
+// macOS/Linux 是在 goroutine 里异步调用 OnBeforeClose 的，弹框时序不可控。
+// 确认框在 menu.go 的 onQuit 里同步弹。
+func (a *App) preventClose() bool {
+	if quitConfirmed.Load() || !a.IsDetecting() {
+		return false
+	}
+	a.emitMenuAction(menuActionCloseBlocked)
+	return true
+}
+
+// emitMenuAction 把菜单动作转发给前端（App.vue 的 handleMenuAction 分发）。
+// 必须在调用时才读 a.ctx —— 构造菜单时 startup 还没跑，a.ctx 是 nil。
+func (a *App) emitMenuAction(name string) {
+	if a.ctx == nil {
+		return
+	}
+	runtime.EventsEmit(a.ctx, "menu:action", name)
 }
 
 // ImportTXT opens a file picker and parses detection targets from a TXT file.
@@ -85,6 +127,10 @@ func (a *App) ImportTXT() ImportResponse {
 // StartDetection runs the selected BOCE checks. An empty or placeholder key
 // keeps returning mock data for UI testing.
 func (a *App) StartDetection(req DetectRequest) DetectResponse {
+	// 仅供 OnBeforeClose 判断「检测中」，不参与任何检测逻辑。
+	detecting.Store(true)
+	defer detecting.Store(false)
+
 	req.APIKey = strings.TrimSpace(req.APIKey)
 	if !req.EnablePollution && !req.EnableHijack && !req.EnableWechat && !req.EnableICP && !req.EnableBlacklist && !req.EnableWall {
 		return DetectResponse{
