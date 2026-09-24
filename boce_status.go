@@ -196,7 +196,7 @@ func summarizeRows(rows []DetectRow) DetectSummary {
 			summary.Normal++
 		case StatusUnregistered:
 			summary.Unregistered++
-		case StatusFailed:
+		case StatusFailed, StatusUnknown:
 			summary.Failed++
 		}
 	}
