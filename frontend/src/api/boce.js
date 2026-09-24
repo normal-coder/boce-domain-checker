@@ -1,4 +1,5 @@
 import {
+  CancelDetection as wailsCancelDetection,
   ExportPollutionExcel as wailsExportPollutionExcel,
   ImportTXT as wailsImportTXT,
   StartDetection as wailsStartDetection,
@@ -206,4 +207,12 @@ export function ExportPollutionExcel(rows = []) {
     path: 'C:/Users/xjw/Desktop/全部污染.xlsx',
     message: `开发预览: 已导出 ${rows.length} 条当前列表数据`,
   })
+}
+
+export function CancelDetection() {
+  if (hasWailsBridge()) {
+    return wailsCancelDetection()
+  }
+
+  return Promise.resolve(false)
 }
