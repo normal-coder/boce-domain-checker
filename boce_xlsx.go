@@ -154,8 +154,30 @@ func xlsxColumnName(idx int) string {
 }
 
 func escapeXML(builder *strings.Builder, value string) {
+	value = stripInvalidXMLChars(value)
 	if value == "" {
 		return
 	}
 	_ = xml.EscapeText(builder, []byte(value))
+}
+
+// stripInvalidXMLChars 剔除 XML 1.0 Char 之外的字符，保留 \t \n \r。
+// XML 1.0 的合法字符是 #x9 | #xA | #xD | [#x20-#xD7FF] | [#xE000-#xFFFD] | [#x10000-#x10FFFF]，
+// 其余（0x00-0x08、0x0B、0x0C、0x0E-0x1F、代理区、U+FFFE/U+FFFF 等）进入单元格
+// 会产出 Excel 打不开的非法 xlsx，这里在转义前先删掉。
+func stripInvalidXMLChars(value string) string {
+	return strings.Map(func(r rune) rune {
+		switch {
+		case r == 0x09 || r == 0x0A || r == 0x0D:
+			return r
+		case r >= 0x20 && r <= 0xD7FF:
+			return r
+		case r >= 0xE000 && r <= 0xFFFD:
+			return r
+		case r >= 0x10000 && r <= 0x10FFFF:
+			return r
+		default:
+			return -1
+		}
+	}, value)
 }

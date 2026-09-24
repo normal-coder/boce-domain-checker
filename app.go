@@ -70,15 +70,19 @@ func (a *App) ImportTXT() ImportResponse {
 		}
 	}
 
-	targets := parseTargetsText(string(content))
-	if len(targets) == 0 {
+	parsed := parseTargetsText(string(content))
+	if len(parsed.Valid) == 0 {
 		return ImportResponse{
 			Message: "未从TXT中解析到有效检测目标",
 		}
 	}
+	message := fmt.Sprintf("已导入 %d 条检测目标", len(parsed.Valid))
+	if len(parsed.Invalid) > 0 {
+		message = fmt.Sprintf("%s，另有 %d 条格式错误已跳过", message, len(parsed.Invalid))
+	}
 	return ImportResponse{
-		Targets: targets,
-		Message: fmt.Sprintf("已导入 %d 条检测目标", len(targets)),
+		Targets: parsed.Valid,
+		Message: message,
 	}
 }
 
@@ -111,7 +115,7 @@ func (a *App) StartDetection(req DetectRequest) DetectResponse {
 		return response
 	}
 
-	targets := normalizeTargets(req.Targets)
+	targets := normalizeTargets(req.Targets).Valid
 	if len(targets) == 0 {
 		targets = mockTargets()
 	}
@@ -167,7 +171,7 @@ func (a *App) StartDetection(req DetectRequest) DetectResponse {
 		Rows:       rows,
 		Summary:    summary,
 		Progress:   100,
-		ExportPath: "C:/Users/xjw/Desktop/全部污染.xlsx",
+		ExportPath: "",
 		Message:    message,
 	}
 }
@@ -210,5 +214,17 @@ func (a *App) ExportPollutionExcel(rows []DetectRow) ExportResponse {
 	return ExportResponse{
 		Path:    path,
 		Message: fmt.Sprintf("已导出 %d 条当前列表数据", len(rows)),
+	}
+}
+
+// ValidateTargets 归一化并严格校验检测目标。域名校验已收口到 Go 侧：
+// 前端只负责展示，最终判定以本方法的返回为准（TXT 导入也走同一套规则，
+// 不再有「导入侧宽松、提交侧严格」的旁路）。
+func (a *App) ValidateTargets(text string) ValidateTargetsResponse {
+	parsed := parseTargetsText(text)
+	return ValidateTargetsResponse{
+		Valid:   parsed.Valid,
+		Invalid: parsed.Invalid,
+		Message: targetValidationMessage(text, parsed),
 	}
 }
