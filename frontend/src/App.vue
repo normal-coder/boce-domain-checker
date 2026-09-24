@@ -5,7 +5,7 @@ import {
   ImportTXT,
   StartDetection,
 } from './api/boce'
-import {EventsOn} from '../wailsjs/runtime/runtime'
+import {ClipboardSetText, EventsOn} from '../wailsjs/runtime/runtime'
 import {ABNORMAL_STATUSES, STATUS_BAD_DOMAIN, STATUS_BLACKLISTED, STATUS_FAILED, STATUS_FILED, STATUS_INTERCEPTED, STATUS_LIST, STATUS_NORMAL, STATUS_POLLUTION, STATUS_SUSPECT_WALLED, STATUS_UNFILED, STATUS_UNREGISTERED, STATUS_WALLED} from './lib/constants'
 
 const rows = ref([])
@@ -253,6 +253,7 @@ function upsertRow(row) {
 
 let unlistenDetectStart = null
 let unlistenDetectRow = null
+let unlistenMenuAction = null
 
 onMounted(() => {
   if (!window.runtime?.EventsOnMultiple) {
@@ -269,6 +270,7 @@ onMounted(() => {
   unlistenDetectRow = EventsOn('detect:row', row => {
     upsertRow(row)
   })
+  unlistenMenuAction = EventsOn('menu:action', handleMenuAction)
 })
 
 onUnmounted(() => {
@@ -278,7 +280,78 @@ onUnmounted(() => {
   if (unlistenDetectRow) {
     unlistenDetectRow()
   }
+  if (unlistenMenuAction) {
+    unlistenMenuAction()
+  }
 })
+
+// 菜单动作分发表 —— 与 Go 侧 menu.go 的 menuAction* 常量逐条对应。
+// 前 4 条复用工具栏按钮的既有函数，保证菜单与按钮行为完全一致。
+function handleMenuAction(action) {
+  switch (action) {
+    case 'import-txt':
+      importTxt()
+      break
+    case 'export-excel':
+      exportExcel()
+      break
+    case 'start':
+      startDetection()
+      break
+    case 'stop':
+      stopDetection()
+      break
+    case 'copy-rows':
+      copyRowsAsText()
+      break
+    case 'clear-targets':
+      clearTargets()
+      break
+    case 'clear-rows':
+      clearRows()
+      break
+    case 'close-blocked':
+      notice.value = '检测进行中，已阻止退出；请先停止检测'
+      break
+    default:
+      break
+  }
+}
+
+function clearTargets() {
+  targetText.value = ''
+  targetError.value = ''
+  importedTargets.value = []
+  notice.value = '已清空检测目标'
+}
+
+function clearRows() {
+  rows.value = []
+  selectedId.value = null
+  progress.value = 0
+  streamTotal.value = 0
+  exportPath.value = ''
+  applySummary({total: 0, checked: 0, pollution: 0, normal: 0, unregistered: 0, failed: 0})
+  keepValidStatusFilter()
+  notice.value = '已清空检测结果'
+}
+
+async function copyRowsAsText() {
+  const shown = displayRows.value
+  if (!shown.length) {
+    notice.value = '当前列表没有可复制的数据'
+    return
+  }
+  const lines = shown.map(row => (isICPResult.value
+    ? [row.domain || row.target, row.status, row.beianCode, row.siteName].join('\t')
+    : [row.type, row.target, row.status, row.checkedAt, row.errorRemark].join('\t')))
+  try {
+    await ClipboardSetText(lines.join('\n'))
+    notice.value = `已复制 ${shown.length} 条结果为文本`
+  } catch {
+    notice.value = '复制失败'
+  }
+}
 
 async function importTxt() {
   const result = await ImportTXT()

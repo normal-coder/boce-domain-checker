@@ -1,5 +1,6 @@
 import {
   ExportPollutionExcel as wailsExportPollutionExcel,
+  GetVersion as wailsGetVersion,
   ImportTXT as wailsImportTXT,
   StartDetection as wailsStartDetection,
 } from '../../wailsjs/go/main/App'
@@ -195,6 +196,14 @@ export function StartDetection(request) {
       ? `开发预览使用测试数据，并发 ${request.concurrency}，超时 ${request.timeoutSeconds} 秒`
       : `未填写有效 API Key，返回测试数据，并发 ${request.concurrency}，超时 ${request.timeoutSeconds} 秒`,
   })
+}
+
+export function GetVersion() {
+  if (hasWailsBridge()) {
+    return wailsGetVersion()
+  }
+
+  return Promise.resolve('dev')
 }
 
 export function ExportPollutionExcel(rows = []) {
