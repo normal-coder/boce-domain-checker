@@ -1,6 +1,7 @@
 <script setup>
 import {computed, onMounted, onUnmounted, reactive, ref} from 'vue'
 import {
+  CancelDetection,
   ExportPollutionExcel,
   ImportTXT,
   StartDetection,
@@ -307,28 +308,31 @@ async function startDetection() {
   const targets = validation.targets
   importedTargets.value = targets
 
-  const result = await StartDetection({
-    apiKey: form.apiKey,
-    enablePollution: form.detectionType === 'pollution',
-    enableHijack: form.detectionType === 'qq',
-    enableWechat: form.detectionType === 'wechat',
-    enableIcp: form.detectionType === 'icp',
-    enableBlacklist: form.detectionType === 'blacklist',
-    enableWall: form.detectionType === 'wall',
-    concurrency: Number(form.concurrency),
-    timeoutSeconds: Number(form.timeoutSeconds),
-    importedTargetCount: targets.length,
-    targets,
-  })
+  try {
+    const result = await StartDetection({
+      apiKey: form.apiKey,
+      enablePollution: form.detectionType === 'pollution',
+      enableHijack: form.detectionType === 'qq',
+      enableWechat: form.detectionType === 'wechat',
+      enableIcp: form.detectionType === 'icp',
+      enableBlacklist: form.detectionType === 'blacklist',
+      enableWall: form.detectionType === 'wall',
+      concurrency: Number(form.concurrency),
+      timeoutSeconds: Number(form.timeoutSeconds),
+      importedTargetCount: targets.length,
+      targets,
+    })
 
-  rows.value = result.rows || rows.value
-  keepValidStatusFilter()
-  selectedId.value = rows.value[12]?.id || rows.value[0]?.id || null
-  applySummary(result.summary)
-  progress.value = result.progress || 100
-  exportPath.value = result.exportPath || exportPath.value
-  notice.value = result.message || '测试检测完成'
-  running.value = false
+    rows.value = result.rows || rows.value
+    keepValidStatusFilter()
+    selectedId.value = rows.value[12]?.id || rows.value[0]?.id || null
+    applySummary(result.summary)
+    progress.value = result.progress || 100
+    exportPath.value = result.exportPath || exportPath.value
+    notice.value = result.message || '测试检测完成'
+  } finally {
+    running.value = false
+  }
 }
 
 function pauseDetection() {
@@ -339,10 +343,13 @@ function pauseDetection() {
   notice.value = paused.value ? '已暂停测试检测' : '继续测试检测'
 }
 
-function stopDetection() {
-  running.value = false
-  paused.value = false
-  notice.value = rows.value.length ? '已停止测试检测' : '当前没有运行中的检测任务'
+async function stopDetection() {
+  if (!running.value) {
+    notice.value = '当前没有运行中的检测任务'
+    return
+  }
+  await CancelDetection()
+  notice.value = '已发送停止请求'
 }
 
 async function exportExcel() {
