@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -15,6 +16,9 @@ import (
 // App struct
 type App struct {
 	ctx context.Context
+
+	detectMu     sync.Mutex
+	detectCancel context.CancelFunc
 }
 
 // NewApp creates a new App application struct.
@@ -26,6 +30,21 @@ func NewApp() *App {
 // so we can call the runtime methods.
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+}
+
+// beginDetection 注册一次可取消的检测，返回的 finish 必须在 StartDetection 里 defer，
+// 否则并发第二次检测会泄漏上一次的 cancel 函数。
+func (a *App) beginDetection() (context.Context, func()) {
+	ctx, cancel := context.WithCancel(context.Background())
+	a.detectMu.Lock()
+	a.detectCancel = cancel
+	a.detectMu.Unlock()
+	return ctx, func() {
+		a.detectMu.Lock()
+		a.detectCancel = nil
+		a.detectMu.Unlock()
+		cancel()
+	}
 }
 
 func (a *App) emitDetectStart(total int) {
@@ -133,6 +152,9 @@ func (a *App) StartDetection(req DetectRequest) DetectResponse {
 		concurrency = 20
 	}
 
+	ctx, finish := a.beginDetection()
+	defer finish()
+
 	client := &http.Client{
 		Timeout: time.Duration(timeout) * time.Second,
 	}
@@ -142,26 +164,29 @@ func (a *App) StartDetection(req DetectRequest) DetectResponse {
 	emitRow := a.emitDetectRow
 	rows := make([]DetectRow, 0, len(targets)*6)
 	if req.EnablePollution {
-		rows = append(rows, runPollutionDetection(client, req.APIKey, targets, concurrency, len(rows), emitRow)...)
+		rows = append(rows, runPollutionDetection(ctx, client, req.APIKey, targets, concurrency, len(rows), emitRow)...)
 	}
 	if req.EnableHijack {
-		rows = append(rows, runQQDetection(client, req.APIKey, targets, concurrency, len(rows), emitRow)...)
+		rows = append(rows, runQQDetection(ctx, client, req.APIKey, targets, concurrency, len(rows), emitRow)...)
 	}
 	if req.EnableWechat {
-		rows = append(rows, runWechatDetection(client, req.APIKey, targets, concurrency, len(rows), emitRow)...)
+		rows = append(rows, runWechatDetection(ctx, client, req.APIKey, targets, concurrency, len(rows), emitRow)...)
 	}
 	if req.EnableICP {
-		rows = append(rows, runICPDetection(client, req.APIKey, targets, concurrency, len(rows), emitRow)...)
+		rows = append(rows, runICPDetection(ctx, client, req.APIKey, targets, concurrency, len(rows), emitRow)...)
 	}
 	if req.EnableBlacklist {
-		rows = append(rows, runBlacklistDetection(client, req.APIKey, targets, concurrency, len(rows), emitRow)...)
+		rows = append(rows, runBlacklistDetection(ctx, client, req.APIKey, targets, concurrency, len(rows), emitRow)...)
 	}
 	if req.EnableWall {
-		rows = append(rows, runWallDetection(client, req.APIKey, targets, concurrency, len(rows), emitRow)...)
+		rows = append(rows, runWallDetection(ctx, client, req.APIKey, targets, concurrency, len(rows), emitRow)...)
 	}
 
 	summary := summarizeRows(rows)
 	message := detectionMessage(req.EnablePollution, req.EnableHijack, req.EnableWechat, req.EnableICP, req.EnableBlacklist, req.EnableWall, concurrency, timeout)
+	if ctx.Err() != nil {
+		message = "已中止，" + message
+	}
 
 	return DetectResponse{
 		Rows:       rows,
@@ -170,6 +195,18 @@ func (a *App) StartDetection(req DetectRequest) DetectResponse {
 		ExportPath: "C:/Users/xjw/Desktop/全部污染.xlsx",
 		Message:    message,
 	}
+}
+
+// CancelDetection aborts a running StartDetection call.
+func (a *App) CancelDetection() bool {
+	a.detectMu.Lock()
+	cancel := a.detectCancel
+	a.detectMu.Unlock()
+	if cancel == nil {
+		return false
+	}
+	cancel()
+	return true
 }
 
 // ExportPollutionExcel exports the rows currently shown in the frontend.
