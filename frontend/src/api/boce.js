@@ -2,8 +2,9 @@ import {
   ExportPollutionExcel as wailsExportPollutionExcel,
   ImportTXT as wailsImportTXT,
   StartDetection as wailsStartDetection,
+  ValidateTargets as wailsValidateTargets,
 } from '../../wailsjs/go/main/App'
-import {STATUS_BAD_DOMAIN, STATUS_BLACKLISTED, STATUS_FAILED, STATUS_FILED, STATUS_INTERCEPTED, STATUS_NORMAL, STATUS_POLLUTION, STATUS_SUSPECT_WALLED, STATUS_UNFILED, STATUS_UNREGISTERED, STATUS_WALLED, TYPE_BLACKLIST, TYPE_ICP, TYPE_POLLUTION, TYPE_QQ, TYPE_WALL, TYPE_WECHAT} from '../lib/constants'
+import {STATUS_BAD_DOMAIN, STATUS_BLACKLISTED, STATUS_FAILED, STATUS_FILED, STATUS_INTERCEPTED, STATUS_NORMAL, STATUS_POLLUTION, STATUS_SUSPECT_WALLED, STATUS_UNFILED, STATUS_UNREGISTERED, STATUS_UNKNOWN, STATUS_WALLED, TYPE_BLACKLIST, TYPE_ICP, TYPE_POLLUTION, TYPE_QQ, TYPE_WALL, TYPE_WECHAT} from '../lib/constants'
 
 const mockTargets = [
   '80823456.com',
@@ -153,7 +154,7 @@ function summarizeRows(rows, request) {
       summary.normal += 1
     } else if (row.status === STATUS_UNREGISTERED) {
       summary.unregistered += 1
-    } else if (row.status === STATUS_FAILED) {
+    } else if (row.status === STATUS_FAILED || row.status === STATUS_UNKNOWN) {
       summary.failed += 1
     }
     return summary
@@ -164,6 +165,87 @@ function summarizeRows(rows, request) {
     normal: 0,
     unregistered: 0,
     failed: 0,
+  })
+}
+
+// 下面 4 个函数是检测目标的严格校验规则，与 Go 侧 boce_targets.go 逐条对应。
+// 校验已收口到 Go 的 ValidateTargets；这里只在没有 Wails bridge（npm run dev）时兜底，
+// 不要再在别处写第二套规则。
+function parseTargetEntries(text) {
+  const seen = new Set()
+  const invalidTargets = []
+  const validTargets = []
+
+  text
+    .split(/[\s,;，；]+/)
+    .map(item => item.trim().replace(/^['"]|['"]$/g, ''))
+    .filter(Boolean)
+    .forEach(item => {
+      const normalized = normalizeTarget(item)
+      if (!normalized) {
+        invalidTargets.push(item)
+        return
+      }
+      if (!seen.has(normalized)) {
+        seen.add(normalized)
+        validTargets.push(normalized)
+      }
+    })
+
+  return {validTargets, invalidTargets}
+}
+
+function normalizeTarget(input) {
+  const raw = input.trim()
+  if (!raw || /[\s@]/.test(raw)) {
+    return ''
+  }
+
+  let targetURL
+  try {
+    if (/^https?:\/\//i.test(raw)) {
+      targetURL = new URL(raw)
+    } else if (/^[a-z][a-z\d+.-]*:\/\//i.test(raw)) {
+      return ''
+    } else {
+      targetURL = new URL(`http://${raw.replace(/^\/+|\/+$/g, '')}`)
+    }
+  } catch {
+    return ''
+  }
+
+  const host = targetURL.hostname.toLowerCase()
+  if (!isValidHost(host)) {
+    return ''
+  }
+  return host
+}
+
+function isValidHost(host) {
+  if (isValidIPv4(host)) {
+    return true
+  }
+  if (host.length > 253 || !host.includes('.') || host.includes('..')) {
+    return false
+  }
+
+  const labels = host.split('.')
+  const topLabel = labels.at(-1)
+  return labels.every(label => (
+    label.length > 0 &&
+    label.length <= 63 &&
+    /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i.test(label)
+  )) && topLabel.length >= 2 && /[a-z]/i.test(topLabel)
+}
+
+function isValidIPv4(host) {
+  const parts = host.split('.')
+  return parts.length === 4 && parts.every(part => {
+    if (!/^\d{1,3}$/.test(part)) {
+      return false
+    }
+    const value = Number(part)
+    return value >= 0 && value <= 255 && String(value) === part
   })
 }
 
@@ -190,7 +272,7 @@ export function StartDetection(request) {
     rows,
     summary: summarizeRows(rows, request),
     progress: 100,
-    exportPath: 'C:/Users/xjw/Desktop/全部污染.xlsx',
+    exportPath: '',
     message: request.apiKey
       ? `开发预览使用测试数据，并发 ${request.concurrency}，超时 ${request.timeoutSeconds} 秒`
       : `未填写有效 API Key，返回测试数据，并发 ${request.concurrency}，超时 ${request.timeoutSeconds} 秒`,
@@ -203,7 +285,21 @@ export function ExportPollutionExcel(rows = []) {
   }
 
   return Promise.resolve({
-    path: 'C:/Users/xjw/Desktop/全部污染.xlsx',
+    path: '',
     message: `开发预览: 已导出 ${rows.length} 条当前列表数据`,
+  })
+}
+
+export function ValidateTargets(text) {
+  if (hasWailsBridge()) {
+    return wailsValidateTargets(text)
+  }
+
+  // 开发预览没有 Go 后端：复用上面这套前端校验逻辑，返回与 Go 同形状的对象。
+  const {validTargets, invalidTargets} = parseTargetEntries(text)
+  return Promise.resolve({
+    valid: validTargets,
+    invalid: invalidTargets,
+    message: '',
   })
 }
