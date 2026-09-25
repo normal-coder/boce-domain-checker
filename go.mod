@@ -7,7 +7,10 @@ go 1.26.0
 // govulncheck ./... 为 0。升级 Go 补丁版本时请同步改这里，并重跑 make audit。
 toolchain go1.26.6
 
-require github.com/wailsapp/wails/v2 v2.16.0
+require (
+	github.com/wailsapp/wails/v2 v2.16.0
+	golang.org/x/net v0.59.0
+)
 
 require (
 	git.sr.ht/~jackmordaunt/go-toast/v2 v2.0.3 // indirect
@@ -35,7 +38,6 @@ require (
 	github.com/wailsapp/go-webview2 v1.0.23 // indirect
 	github.com/wailsapp/mimetype v1.4.1 // indirect
 	golang.org/x/crypto v0.57.0 // indirect
-	golang.org/x/net v0.59.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 )
