@@ -1,6 +1,7 @@
 <script setup>
 import {computed, onMounted, onUnmounted, reactive, ref} from 'vue'
 import {
+  CancelDetection,
   ExportPollutionExcel,
   ImportTXT,
   StartDetection,
