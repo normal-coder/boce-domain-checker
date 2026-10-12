@@ -6,6 +6,7 @@ import {
   StartDetection,
 } from './api/boce'
 import {EventsOn} from '../wailsjs/runtime/runtime'
+import {ABNORMAL_STATUSES, STATUS_BAD_DOMAIN, STATUS_BLACKLISTED, STATUS_FAILED, STATUS_FILED, STATUS_INTERCEPTED, STATUS_LIST, STATUS_NORMAL, STATUS_POLLUTION, STATUS_SUSPECT_WALLED, STATUS_UNFILED, STATUS_UNREGISTERED, STATUS_WALLED} from './lib/constants'
 
 const rows = ref([])
 const selectedId = ref(null)
@@ -35,7 +36,9 @@ const summary = reactive({
   failed: 0,
 })
 
-const statusOrder = ['污染', '拦截', '未备案', '黑名单', '被墙', '疑似被墙', '域名格式错误', '正常', '已备案', '未注册', '失败', '未知']
+
+const canPause = computed(() => running.value && rows.value.length > 0)
+const statusOrder = STATUS_LIST
 const statusOptions = computed(() => {
   const statuses = [...new Set(rows.value.map(row => row.status).filter(Boolean))]
   statuses.sort((left, right) => {
@@ -73,7 +76,7 @@ const loadingText = computed(() => {
 })
 
 function isAbnormalStatus(status) {
-  return ['污染', '拦截', '未备案', '黑名单', '被墙', '疑似被墙', '域名格式错误', '失败', '未知'].includes(status)
+  return ABNORMAL_STATUSES.includes(status)
 }
 
 function matchStatusFilter(status) {
@@ -203,13 +206,13 @@ function summarizeRows(targetRows) {
   return targetRows.reduce((nextSummary, row) => {
     nextSummary.total += 1
     nextSummary.checked += 1
-    if (row.status === '污染' || row.status === '拦截' || row.status === '未备案' || row.status === '黑名单' || row.status === '被墙' || row.status === '疑似被墙' || row.status === '域名格式错误') {
+    if (row.status === STATUS_POLLUTION || row.status === STATUS_INTERCEPTED || row.status === STATUS_UNFILED || row.status === STATUS_BLACKLISTED || row.status === STATUS_WALLED || row.status === STATUS_SUSPECT_WALLED || row.status === STATUS_BAD_DOMAIN) {
       nextSummary.pollution += 1
-    } else if (row.status === '正常' || row.status === '已备案') {
+    } else if (row.status === STATUS_NORMAL || row.status === STATUS_FILED) {
       nextSummary.normal += 1
-    } else if (row.status === '未注册') {
+    } else if (row.status === STATUS_UNREGISTERED) {
       nextSummary.unregistered += 1
-    } else if (row.status === '失败') {
+    } else if (row.status === STATUS_FAILED) {
       nextSummary.failed += 1
     }
     return nextSummary
