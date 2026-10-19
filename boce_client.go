@@ -16,51 +16,6 @@ const boceBatchSize = 20
 // 能把请求指到 net/http/httptest 假服务器；生产取值不变。
 var boceBaseURL = "https://api.boce.com/v3/"
 
-func queryPollution(ctx context.Context, client *http.Client, apiKey string, host string) (int, error) {
-	endpoint, err := url.Parse(boceBaseURL + "task/create/pollute")
-	if err != nil {
-		return 0, err
-	}
-
-	query := endpoint.Query()
-	setBoceTaskQuery(query, apiKey, host)
-	endpoint.RawQuery = query.Encode()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
-	if err != nil {
-		return 0, err
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return 0, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return 0, fmt.Errorf("HTTP %d", resp.StatusCode)
-	}
-
-	var result bocePolluteResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return 0, err
-	}
-	if result.ErrorCode != 0 {
-		if result.Error != "" {
-			return 0, errors.New(result.Error)
-		}
-		return 0, fmt.Errorf("BOCE error_code %d", result.ErrorCode)
-	}
-
-	if status, ok := result.Data[host]; ok {
-		return status, nil
-	}
-	for _, status := range result.Data {
-		return status, nil
-	}
-
-	return 0, fmt.Errorf("响应缺少检测结果")
-}
-
 func queryQQBatch(ctx context.Context, client *http.Client, apiKey string, hosts []string) (map[string]int, error) {
 	return queryBlockBatch(ctx, client, apiKey, hosts, "task/create/qq")
 }

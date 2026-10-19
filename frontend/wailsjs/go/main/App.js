@@ -17,3 +17,7 @@ export function ImportTXT() {
 export function StartDetection(arg1) {
   return window['go']['main']['App']['StartDetection'](arg1);
 }
+
+export function ValidateTargets(arg1) {
+  return window['go']['main']['App']['ValidateTargets'](arg1);
+}
