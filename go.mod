@@ -2,14 +2,14 @@ module boce_tool_app
 
 go 1.26.0
 
-// toolchain 钉住 Go 补丁版本：go1.26.1 的 crypto/tls、crypto/x509 有 govulncheck
-// 可达漏洞（本应用用 HTTPS 调 BOCE API，是真实触达路径）。升到 go1.26.6 后
-// govulncheck ./... 为 0。升级 Go 补丁版本时请同步改这里，并重跑 make audit。
-toolchain go1.26.6
+// toolchain 钉住 Go 补丁版本：crypto/tls、crypto/x509、net/http 有 govulncheck
+// 可达漏洞（本应用用 HTTPS 调 BOCE API，是真实触达路径）。go1.26.1 → 1.26.6 →
+// 1.26.9 各修一批，新漏洞会持续出现；升补丁版本时同步改这里，并重跑 make audit。
+toolchain go1.26.9
 
 require (
 	github.com/wailsapp/wails/v2 v2.16.0
-	golang.org/x/net v0.59.0
+	golang.org/x/net v0.60.0
 )
 
 require (
