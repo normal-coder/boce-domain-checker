@@ -57,6 +57,13 @@ jobs:
   windows:
     name: Windows (amd64)
     runs-on: windows-latest
+    # Windows runner 的 run: 默认 shell 是 pwsh，不是 bash。`${VAR}` 是 bash 语法，
+    # pwsh 不展开，会把 `@${WAILS_CLI_VERSION}` 变成 `@`（实测报
+    # `version must not be empty`）。整条 job 的 run: 一律走 bash，与 macOS 一致；
+    # 需要 PowerShell 的步骤自己写 `shell: pwsh` 覆盖（见下面 choco 那步）。
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
 
