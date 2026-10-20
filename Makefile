@@ -118,7 +118,7 @@ package-darwin: build-darwin-arm64 build-darwin-amd64 ## 打包两个 macOS 平�
 package-windows: build-windows-amd64 ## 打包 Windows 平台（zip）
 	mkdir -p $(RELEASE)
 	rm -f $(RELEASE)/boce_tool_app_windows_amd64.zip
-	(cd $(STAGE)/windows-amd64 && zip -y $(CURDIR)/$(RELEASE)/boce_tool_app_windows_amd64.zip boce_tool_app.exe)
+	(cd $(STAGE)/windows-amd64 && zip $(CURDIR)/$(RELEASE)/boce_tool_app_windows_amd64.zip boce_tool_app.exe)
 
 package: package-darwin package-windows ## 打包全部平台（命名契约唯一所在地）
 	rm -rf $(STAGE)
