@@ -49,10 +49,15 @@ jobs:
       - name: 安装 govulncheck（make audit 用，版本与 Makefile 对齐）
         run: go install golang.org/x/vuln/cmd/govulncheck@v1.8.0
 
-      - name: 安装 golangci-lint（版本与 .golangci.yml 的 v1 配置格式对齐）
+      # 必须 go install 现编，不能用 install.sh 的预编译二进制：
+      #   golangci-lint 要求「编译它自己的 Go 版本」>= 项目 go.mod 的目标版本，
+      #   而 v1.64.8 的官方预编译产物是 go1.24 编的，加载配置时直接失败：
+      #     can't load config: the Go language version (go1.24) used to build
+      #     golangci-lint is lower than the targeted Go version (1.26.6)
+      # 上面 setup-go 已按 go.mod 装好 go1.26.x，用它编出来的二进制 runtime.Version() 才够新。
+      - name: 安装 golangci-lint（go install 现编，避开预编译产物 Go 版本过旧）
         run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh \
-            | sh -s -- -b "$(go env GOPATH)/bin" v1.64.8
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
           golangci-lint version
 
       - name: 构建前端（//go:embed 的硬前置）
