@@ -78,27 +78,40 @@ VERSION ?= $(shell git describe --tags --always --dirty)
 RELEASE := build/release
 STAGE   := $(RELEASE)/.stage
 
-.PHONY: build-darwin-arm64 build-darwin-amd64 build-windows-amd64 build-all \
+.PHONY: inject-version build-darwin-arm64 build-darwin-amd64 build-windows-amd64 build-all \
         package-darwin package-windows package checksums release
 
 # 产物都落在 build/bin 里，必须串行，不能并行跑这几个 target。
 .NOTPARALLEL: build-all package-darwin package-windows package
 
-build-darwin-arm64: ## 构建 macOS (Apple Silicon) .app → build/bin/boce_tool_app.app
+# 版本号有两条独立通道，缺一不可（见本文件末尾「发布」一节的硬约束 6）：
+#   1. wails.json 的 info.productVersion → Info.plist 的 CFBundleShortVersionString
+#      / CFBundleVersion，也就是 Finder「显示简介」和系统里显示的版本。
+#   2. -ldflags "-X main.Version=..." → 应用内 GetVersion() / 「关于」对话框。
+# 做成 build-* 的前置而不是只写在 release 里，是因为 wails build 读 productVersion
+# 的时机就在这儿 —— release.yml 走的是 `make package-*`，绕过 release 的话注入会被
+# 整段跳过（v1.1.0 首发时 Info.plist 就是这么留在 1.0.0 的）。
+inject-version: ## 把 VERSION 写进 wails.json 的 info.productVersion
+	@set -e; \
+	sed -e 's/"productVersion"[[:space:]]*:[[:space:]]*"[^"]*"/"productVersion": "$(VERSION)"/' wails.json > wails.json.tmp && mv wails.json.tmp wails.json; \
+	grep -q '"productVersion": "$(VERSION)"' wails.json || { echo "版本注入失败：wails.json 的 productVersion 未被改写为 $(VERSION)" >&2; exit 1; }; \
+	echo "productVersion → $(VERSION)"
+
+build-darwin-arm64: inject-version ## 构建 macOS (Apple Silicon) .app → build/bin/boce_tool_app.app
 	wails build -clean -platform darwin/arm64 -m -nosyncgomod -ldflags "-X main.Version=$(VERSION)"
 	rm -rf $(STAGE)/darwin-arm64
 	mkdir -p $(STAGE)/darwin-arm64
 	cp -R build/bin/boce_tool_app.app $(STAGE)/darwin-arm64/
 	cp scripts/fix_mac_quarantine.sh $(STAGE)/darwin-arm64/
 
-build-darwin-amd64: ## 构建 macOS (Intel) .app → build/bin/boce_tool_app.app
+build-darwin-amd64: inject-version ## 构建 macOS (Intel) .app → build/bin/boce_tool_app.app
 	wails build -clean -platform darwin/amd64 -m -nosyncgomod -ldflags "-X main.Version=$(VERSION)"
 	rm -rf $(STAGE)/darwin-amd64
 	mkdir -p $(STAGE)/darwin-amd64
 	cp -R build/bin/boce_tool_app.app $(STAGE)/darwin-amd64/
 	cp scripts/fix_mac_quarantine.sh $(STAGE)/darwin-amd64/
 
-build-windows-amd64: ## 构建 Windows 64 位 → build/bin/boce_tool_app.exe
+build-windows-amd64: inject-version ## 构建 Windows 64 位 → build/bin/boce_tool_app.exe
 	wails build -clean -platform windows/amd64 -m -nosyncgomod -ldflags "-X main.Version=$(VERSION)"
 	rm -rf $(STAGE)/windows-amd64
 	mkdir -p $(STAGE)/windows-amd64
@@ -132,8 +145,6 @@ release: ## 一键发布：注入版本 → 三平台构建打包 → SHA256SUMS
 	@set -e; \
 	backup=$$(mktemp); cp wails.json "$$backup"; \
 	trap 'cp "$$backup" wails.json; rm -f "$$backup"' EXIT INT TERM; \
-	sed -e 's/"productVersion"[[:space:]]*:[[:space:]]*"[^"]*"/"productVersion": "$(VERSION)"/' wails.json > wails.json.tmp && mv wails.json.tmp wails.json; \
-	grep -q '"productVersion": "$(VERSION)"' wails.json || { echo "版本注入失败：wails.json 的 productVersion 未被改写为 $(VERSION)" >&2; exit 1; }; \
-	echo "productVersion → $(VERSION)"; \
+	$(MAKE) --no-print-directory VERSION=$(VERSION) inject-version; \
 	$(MAKE) --no-print-directory VERSION=$(VERSION) package; \
 	$(MAKE) --no-print-directory checksums
