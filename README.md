@@ -110,22 +110,26 @@ make frontend
 按平台构建（**一平台一次**，不要一次指定多个平台）：
 
 ```bash
-make build-darwin-arm64   # macOS Apple Silicon（M 系列）→ build/bin/boce_tool_app.app
-make build-darwin-amd64   # macOS Intel            → build/bin/boce_tool_app.app
-make build-windows-amd64  # Windows 64 位          → build/bin/boce_tool_app.exe
+make build-darwin-arm64   # macOS Apple Silicon（M 系列）→ build/bin/Boce.app
+make build-darwin-amd64   # macOS Intel            → build/bin/Boce.app
+make build-windows-amd64  # Windows 64 位          → build/bin/Boce.exe
 make build-all            # 串行构建上面三个
 ```
 
-等价的 wails 命令：
-
-```bash
-wails build -clean -platform darwin/arm64 -m -nosyncgomod
-wails build -clean -platform darwin/amd64 -m -nosyncgomod
-wails build -clean -platform windows/amd64 -m -nosyncgomod
-```
-
+> **请走 `make build-*`，不要手敲裸 `wails build`。** 裸命令会漏掉版本注入，
+> 打出来的包「关于」里显示「版本 dev」、Finder「显示简介」里版本也是旧的：
+> `make build-*` 会先跑 `inject-version`（写 `wails.json` 的 `info.productVersion`），
+> 再带上 `-ldflags "-X main.Version=$(VERSION)"`，两条通道一起灌进去。
+> 确实要绕开 make 时，完整等价命令是：
+>
+> ```bash
+> wails build -clean -platform darwin/arm64 -m -nosyncgomod -ldflags "-X main.Version=$(git describe --tags --always --dirty)"
+> ```
+>
+> （还要先把 `wails.json` 的 `info.productVersion` 改成同一个值，否则系统里显示的版本仍是旧的。）
+>
 > **不要**写成 `wails build -platform darwin/amd64,darwin/arm64,windows/amd64`：
-> 多 target 会产出带连字符的文件名（如 `boce_tool_app-darwin-arm64`），与下面的
+> 多 target 会产出带连字符的文件名（如 `Boce-darwin-arm64`），与下面的
 > 发布物命名契约对不上；而且 `-clean` 只对第一个平台生效，产物会串台。
 >
 > **Linux 目前没有构建 target**：`wails build -platform linux/amd64` **仅限 Linux 主机**，
@@ -147,11 +151,11 @@ make release   # 注入版本 → 三平台构建 → 打包 → 校验和
 
 ```text
 build/release/
-├── boce_tool_app_darwin_arm64.zip   # 内含 boce_tool_app.app + fix_mac_quarantine.sh
+├── boce_tool_app_darwin_arm64.zip   # 内含 Boce.app + fix_mac_quarantine.sh
 ├── boce_tool_app_darwin_arm64.dmg   # 推荐给 Mac 用户，可直接拖进「应用程序」
-├── boce_tool_app_darwin_amd64.zip   # 内含 boce_tool_app.app + fix_mac_quarantine.sh
+├── boce_tool_app_darwin_amd64.zip   # 内含 Boce.app + fix_mac_quarantine.sh
 ├── boce_tool_app_darwin_amd64.dmg
-├── boce_tool_app_windows_amd64.zip  # 内含 boce_tool_app.exe
+├── boce_tool_app_windows_amd64.zip  # 内含 Boce.exe
 └── SHA256SUMS.txt
 ```
 
@@ -171,17 +175,17 @@ build/release/
 也可以在解压出来的目录里执行：
 
 ```bash
-open boce_tool_app.app
+open Boce.app
 ```
 
 > 发布物是 **`.app` 应用包**，不是裸二进制：没有 `chmod +x` 这一步，
-> 也不要 `./boce_tool_app_darwin_arm64` 这样直接跑。
+> 也不要 `./Boce` 这样直接跑。
 
 如果 Mac 提示「文件已损坏」或「无法打开」，是下载文件被 Gatekeeper 隔离标记导致。
 在解压后的文件目录执行：
 
 ```bash
-xattr -dr com.apple.quarantine boce_tool_app.app
+xattr -dr com.apple.quarantine Boce.app
 ```
 
 或直接运行同目录下自带的脚本：
@@ -193,7 +197,7 @@ xattr -dr com.apple.quarantine boce_tool_app.app
 > **DMG 不解决 Gatekeeper 隔离**。DMG 只是容器格式，未签名应用从 DMG 拖出来后仍会被拦，
 > 未签名应用仍需此步骤。Apple Developer ID 签名 + 公证已明确延后，落地之前这一步不可省略。
 
-Apple Silicon 与 Intel Mac 的命令相同（两边的应用都叫 `boce_tool_app.app`）。
+Apple Silicon 与 Intel Mac 的命令相同（两边的应用都叫 `Boce.app`）。
 
 如果 zip / dmg 解压时就提示损坏，请先确认文件大小和校验值是否一致：
 
