@@ -78,6 +78,15 @@ func (a *App) GetVersion() string {
 	return Version
 }
 
+// displayVersion 返回给界面看的版本号。未注入（本地裸 wails build）时不要把 "dev"
+// 直接甩给用户 —— 看起来像包坏了。说清楚是本地构建。
+func displayVersion() string {
+	if Version == "" || Version == "dev" {
+		return "本地构建"
+	}
+	return Version
+}
+
 // IsDetecting 报告是否有检测任务正在执行。
 func (a *App) IsDetecting() bool {
 	return detecting.Load()

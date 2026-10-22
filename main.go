@@ -52,7 +52,7 @@ func main() {
 		Mac: &mac.Options{
 			About: &mac.AboutInfo{
 				Title:   "BOCE 检测工具",
-				Message: "版本 " + Version,
+				Message: "版本 " + displayVersion(),
 			},
 		},
 		Bind: []interface{}{

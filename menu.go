@@ -176,7 +176,7 @@ func (a *App) onAbout(*menu.CallbackData) {
 	_, _ = wailsrt.MessageDialog(a.ctx, wailsrt.MessageDialogOptions{
 		Type:    wailsrt.InfoDialog,
 		Title:   aboutDialogTitle,
-		Message: fmt.Sprintf("BOCE 检测工具\n版本 %s\n\n域名批量检测：DNS 污染 / QQ 拦截 / 微信拦截 / ICP 备案 / 备案黑名单 / 被墙。\nAPI Key 在 %s 申请。", Version, boceHomeURL),
+		Message: fmt.Sprintf("BOCE 检测工具\n版本 %s\n\n域名批量检测：DNS 污染 / QQ 拦截 / 微信拦截 / ICP 备案 / 备案黑名单 / 被墙。\nAPI Key 在 %s 申请。", displayVersion(), boceHomeURL),
 	})
 }
 
