@@ -4,8 +4,9 @@ go 1.26.0
 
 // toolchain 钉住 Go 补丁版本：crypto/tls、crypto/x509、net/http 有 govulncheck
 // 可达漏洞（本应用用 HTTPS 调 BOCE API，是真实触达路径）。go1.26.1 → 1.26.6 →
-// 1.26.9 各修一批，新漏洞会持续出现；升补丁版本时同步改这里，并重跑 make audit。
-toolchain go1.26.9
+// 1.26.9 → 1.26.10 各修一批（1.26.10 修 GO-2026-6809：crypto/x509 不再信任被
+// 污染的中间证书），新漏洞会持续出现；升补丁版本时同步改这里，并重跑 make audit。
+toolchain go1.26.10
 
 require (
 	github.com/wailsapp/wails/v2 v2.16.0
